@@ -1420,6 +1420,7 @@ if [ ! -x \"\$BUN_BIN\" ]; then
   echo \"clawgod: install bun  curl -fsSL https://bun.sh/install | bash\" >&2
   exit 127
 fi
+export CLAUDE_CODE_EXECPATH=\"\$(dirname \"\$0\")/claude.orig\"
 exec \"\$BUN_BIN\" \"\$CLAWGOD_CLI\" \"\$@\""
 
 # Detect where claude is actually installed (supports native, npm, pnpm, yarn).
