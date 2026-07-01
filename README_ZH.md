@@ -62,6 +62,14 @@ irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | ie
 | **操作审慎** | 破坏性操作前的强制确认 |
 | **登录提示** | 启动时的"未登录"提醒 |
 
+### 地区隐写中和
+
+| 补丁 | 中和内容 |
+|------|---------|
+| **日期字符串 (qla)** | 系统提示词通过 Unicode 撇号变体（U+0027 / U+2019 / U+02BC / U+02B9）和日期分隔符（中国时区 `-` → `/`）编码用户地理位置。Patch 后始终使用 ASCII `'` 和原始日期格式 |
+| **地区检测探针 (rdp)** | 客户端三维检测：时区（`Asia/Shanghai` / `Asia/Urumqi`）、代理域名与 XOR 混淆的 100+ 域名黑名单比对、base URL 中的国产大模型关键词。Patch 后始终返回 null |
+| **撇号选择器 (odp)** | 根据检测结果选择四种 Unicode 撇号之一。Patch 后始终返回 ASCII `'`（纵深防御） |
+
 ### 视觉
 
 | 补丁 | 效果 |
@@ -112,7 +120,7 @@ claude.orig         # 原版未修改版本（自动备份）
 2. 从 `__BUN` segment（Mach-O / ELF / PE）抽出嵌入的 `cli.js` 源码
 3. 抽出嵌入的 `.node` 原生模块（audio-capture、image-processor、computer-use-*、url-handler）放到 `~/.clawgod/vendor/`
 4. 把 `/$bunfs/...` 虚拟路径重写到本地 vendor 路径
-5. 应用 23 条正则 patch（跨版本兼容，同一组 regex 覆盖多个 release）
+5. 应用 28 条正则 patch（跨版本兼容，同一组 regex 覆盖多个 release）
 6. `claude` / `clawgod` launcher 在 Bun runtime 下跑 patched cli.js
 
 `~/.clawgod/.source-version` 标记当时被 patch 的版本号。每次启动 wrapper 比对它和 `versions/` 里最新二进制；如果用户走官方途径升级了 Claude Code，下次启动会自动重打补丁。

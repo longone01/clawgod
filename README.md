@@ -62,6 +62,14 @@ Green logo = patched. Orange logo = original.
 | **Cautious Actions** | Forced confirmation before destructive operations |
 | **Login Notice** | "Not logged in" startup reminder |
 
+### Geo-Steganography Neutralization
+
+| Patch | What's neutralized |
+|-------|-------------------|
+| **Date String (qla)** | System prompt encodes user location via Unicode apostrophe variants (U+0027 / U+2019 / U+02BC / U+02B9) and date separator (`-` vs `/` for CN timezone). Patched to always use ASCII `'` and unmodified date format |
+| **Geo-Detection Probe (rdp)** | Client-side three-axis detection: timezone (`Asia/Shanghai` / `Asia/Urumqi`), proxy hostname against XOR-obfuscated 100+ domain blocklist, CN-LLM vendor keywords in base URL. Patched to always return null |
+| **Apostrophe Selector (odp)** | Selects one of four Unicode apostrophes based on detection results. Patched to always return ASCII `'` (defense-in-depth) |
+
 ### Visual
 
 | Patch | Effect |
@@ -112,7 +120,7 @@ Since `@anthropic-ai/claude-code` v2.1.113, the npm package no longer ships `cli
 2. Extracts the embedded `cli.js` source from the `__BUN` segment (Mach-O / ELF / PE)
 3. Extracts the embedded `.node` native modules (audio-capture, image-processor, computer-use-*, url-handler) into `~/.clawgod/vendor/`
 4. Rewrites `/$bunfs/...` virtual paths to point at the extracted modules
-5. Applies 23 regex-based patches (version-agnostic — same patches work across many releases)
+5. Applies 28 regex-based patches (version-agnostic — same patches work across many releases)
 6. The `claude` / `clawgod` launchers run the patched cli.js under the Bun runtime
 
 A `.source-version` stamp in `~/.clawgod/` records which native version was patched. On every launch the wrapper compares it against the latest binary in `versions/`; if the user upgraded Claude Code via the official installer, ClawGod auto-re-patches on the next run.
