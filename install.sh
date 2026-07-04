@@ -16,7 +16,7 @@ CLAWGOD_DIR="$HOME/.clawgod"
 BIN_DIR="$HOME/.local/bin"
 VERSION="${CLAWGOD_VERSION:-latest}"
 NO_UPGRADE="${CLAWGOD_NO_UPGRADE:-}"
-CLAWGOD_SELF_VERSION="1.4.0"
+CLAWGOD_SELF_VERSION="1.4.1"
 
 # Parse args
 while [[ $# -gt 0 ]]; do

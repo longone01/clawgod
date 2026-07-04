@@ -26,7 +26,7 @@ if ($env:CLAWGOD_NO_UPGRADE -eq "1") { $NoUpgrade = [switch]$true }
 
 $ClawDir = Join-Path $env:USERPROFILE ".clawgod"
 $BinDir  = Join-Path $env:USERPROFILE ".local\bin"
-$ClawSelfVersion = "1.4.0"
+$ClawSelfVersion = "1.4.1"
 
 # ─── Colors ───────────────────────────────────────────
 
