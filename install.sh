@@ -1522,6 +1522,19 @@ LEAN_MAX_FLAG="$CLAWGOD_DIR/.lean-max"
 # Handle explicit toggle from CLI (--lean-off / --lean-on / --lean-max)
 if [ "$LEAN_OFF" = "1" ]; then
   touch "$LEAN_OFF_FLAG"; rm -f "$LEAN_MAX_FLAG"
+  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+  if [ -f "$CLAUDE_SETTINGS" ]; then
+    node -e '
+const fs=require("fs"),p=process.argv[1];
+const allDeny=new Set(["DesignSync","NotebookEdit","PushNotification","RemoteTrigger","CronCreate","CronDelete","CronList","EnterPlanMode","ExitPlanMode","SendMessage","ScheduleWakeup","AskUserQuestion","ReportFindings"]);
+const allFlags=["disableWorkflows","disableRemoteControl","disableClaudeAiConnectors","disableArtifact","disableBundledSkills"];
+let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{process.exit(0)}
+for(const k of allFlags)delete s[k];
+if(Array.isArray(s.permissions?.deny))s.permissions.deny=s.permissions.deny.filter(t=>!allDeny.has(t));
+fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n");
+' "$CLAUDE_SETTINGS" 2>/dev/null
+  fi
+  info "Lean mode disabled (all tools restored)"
 elif [ "$LEAN_ON" = "1" ]; then
   rm -f "$LEAN_OFF_FLAG" "$LEAN_MAX_FLAG"
 elif [ "$LEAN_MAX" = "1" ]; then
