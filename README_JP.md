@@ -86,9 +86,9 @@ irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | ie
 | **サードパーティ Cache 修正** | `baseURL` が Anthropic 以外を指す場合、`x-anthropic-billing-header` を自動的に無効化します。このヘッダーの `cch` フィールドはリクエストごとに変化するため、DeepSeek / OneAPI / Bedrock / vLLM など Anthropic 互換プロキシでは prompt-cache ヒット率がゼロになります。`CLAUDE_CODE_ATTRIBUTION_HEADER=0` を自分で設定する必要はもうありません。 |
 | **自動再パッチ** | ユーザーがネイティブ Claude バイナリをアップグレードすると、次回起動時に自動的に再抽出・再パッチ |
 | **アップデート通知** | 24時間ごとに GitHub releases を非同期チェック（ノンブロッキング）。新バージョンが利用可能な場合、起動前に1行の通知を表示 |
-| **リーン設定** | インストール時にトークン節約のデフォルト設定を `~/.claude/settings.json` へ自動マージ — 未使用のツール定義（DesignSync、NotebookEdit、Cron* など）を削除し、Workflows/RemoteControl/Artifact を無効化。1ターンあたり数万トークンを節約 |
+| **リーン設定** | `~/.claude/settings.json` の3段階トークン最適化。**on**（デフォルト）：未使用ツール定義の削除 + Workflows/RemoteControl/Artifact 無効化。**max**：Plan mode、Agent Teams、内蔵スキルも追加削除。**off**：全ツール復元 |
 
-> **リーン設定**は既存の設定を壊しません。`settings.json` に存在しないキーのみ追加されます。いつでも切替可能：`claude --lean-off` / `claude --lean-on`（即座に反映、再インストール不要）。個別設定の解除は自分で値を設定してください（例：`"disableArtifact": false`）。
+> **リーン設定**は既存の設定を壊さず、アップデート後も選択が維持されます。いつでも切替：`claude --lean-on`（デフォルト）/ `claude --lean-max`（アグレッシブ）/ `claude --lean-off`（全復元）。個別設定の解除は自分で値を設定（例：`"disableArtifact": false`）。
 
 ## コマンド
 
