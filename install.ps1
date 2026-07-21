@@ -1300,7 +1300,8 @@ if (_realExecPath !== process.execPath) {
     configurable: true,
   });
   if (typeof Bun !== 'undefined' && !Bun.isStandaloneExecutable) {
-    Object.defineProperty(Bun, 'isStandaloneExecutable', { value: true, configurable: true });
+    try { Object.defineProperty(Bun, 'isStandaloneExecutable', { value: true, configurable: true }); }
+    catch { Bun.isStandaloneExecutable = true; }
   }
 }
 

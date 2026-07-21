@@ -1189,7 +1189,8 @@ if (_realExecPath !== process.execPath) {
   // fv()=false → DLt() prepends cli.cjs → "claude.orig cli.cjs respawn <id>"
   // which the native binary silently ignores. See issue #133.
   if (typeof Bun !== 'undefined' && !Bun.isStandaloneExecutable) {
-    Object.defineProperty(Bun, 'isStandaloneExecutable', { value: true, configurable: true });
+    try { Object.defineProperty(Bun, 'isStandaloneExecutable', { value: true, configurable: true }); }
+    catch { Bun.isStandaloneExecutable = true; }
   }
 }
 
