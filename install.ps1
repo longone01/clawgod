@@ -1299,10 +1299,6 @@ if (_realExecPath !== process.execPath) {
     value: _realExecPath,
     configurable: true,
   });
-  if (typeof Bun !== 'undefined' && !Bun.isStandaloneExecutable) {
-    try { Object.defineProperty(Bun, 'isStandaloneExecutable', { value: true, configurable: true }); }
-    catch { Bun.isStandaloneExecutable = true; }
-  }
 }
 
 // Lean mode toggle — --lean-off / --lean-on / --lean-max
@@ -1406,6 +1402,11 @@ const patches = [
     pattern: /function ([\w$]+)\(\)\{return"external"\}/g,
     replacer: (m, fn) => `function ${fn}(){return"ant"}`,
     sentinel: 'return"external"',
+  },
+  {
+    name: 'Bun.isStandaloneExecutable → true',
+    pattern: /function ([\w$]+)\(\)\{return Bun\.isStandaloneExecutable===!0\}/g,
+    replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
     name: 'GrowthBook env overrides',

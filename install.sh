@@ -1184,14 +1184,6 @@ if (_realExecPath !== process.execPath) {
     value: _realExecPath,
     configurable: true,
   });
-  // Daemon/fork spawns check Bun.isStandaloneExecutable to decide whether to
-  // include process.argv[1] (cli.cjs) in prefixArgs. Without this patch,
-  // fv()=false → DLt() prepends cli.cjs → "claude.orig cli.cjs respawn <id>"
-  // which the native binary silently ignores. See issue #133.
-  if (typeof Bun !== 'undefined' && !Bun.isStandaloneExecutable) {
-    try { Object.defineProperty(Bun, 'isStandaloneExecutable', { value: true, configurable: true }); }
-    catch { Bun.isStandaloneExecutable = true; }
-  }
 }
 
 // Lean mode toggle — --lean-off / --lean-on / --lean-max
@@ -1299,6 +1291,17 @@ const patches = [
     pattern: /function ([\w$]+)\(\)\{return"external"\}/g,
     replacer: (m, fn) => `function ${fn}(){return"ant"}`,
     sentinel: 'return"external"',
+  },
+  {
+    // Bun.isStandaloneExecutable is false under clawgod (plain Bun runtime,
+    // not a compiled standalone binary). fv() guards daemon/fork spawn logic
+    // (DLt), multitool dispatch (RS), and several other codepaths that need
+    // to behave as if running the native binary. The property is frozen on
+    // Bun 1.4+ (configurable:false, writable:false), so runtime monkey-patch
+    // is impossible — patch the source instead. See issue #133.
+    name: 'Bun.isStandaloneExecutable → true',
+    pattern: /function ([\w$]+)\(\)\{return Bun\.isStandaloneExecutable===!0\}/g,
+    replacer: (m, fn) => `function ${fn}(){return!0}`,
   },
   {
     name: 'GrowthBook env overrides',

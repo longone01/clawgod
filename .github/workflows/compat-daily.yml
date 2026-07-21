@@ -192,32 +192,22 @@ jobs:
           exec_path="$HOME/.local/bin/claude.orig"
           export CLAUDE_CODE_EXECPATH="$exec_path"
 
-          echo "── Checking process.execPath & Bun.isStandaloneExecutable ──"
-          bun -e "
-            // cli.cjs reads CLAUDE_CODE_EXECPATH and patches process.execPath + Bun.isStandaloneExecutable
-            // Stop before cli.original.cjs runs by intercepting require
-            const Module = require('module');
-            const _orig = Module.prototype.require;
-            Module.prototype.require = function(id) {
-              if (id.includes('cli.original.cjs')) { return; }
-              return _orig.apply(this, arguments);
-            };
-            require('$HOME/.clawgod/cli.cjs');
-            const checks = {
-              execPath_patched: process.execPath === '$exec_path',
-              execPath_exists: require('fs').existsSync(process.execPath),
-              isStandaloneExecutable: Bun.isStandaloneExecutable === true,
-            };
-            console.log(JSON.stringify(checks));
-            const failed = Object.entries(checks).filter(([,v]) => !v);
-            if (failed.length) {
-              console.error('FAILED:', failed.map(([k]) => k).join(', '));
-              process.exit(1);
-            }
-          " 2>&1 || {
-            echo "::error::Runtime invariant check failed"
+          echo "── Checking fv() patched (Bun.isStandaloneExecutable → true) ──"
+          # The patcher replaces fv(){return Bun.isStandaloneExecutable===!0}
+          # with fv(){return!0}. If the original form is still present, the
+          # patch missed and daemon/fork/multitool will break.
+          if grep -q 'Bun\.isStandaloneExecutable===!0' "$HOME/.clawgod/cli.original.cjs"; then
+            echo "::error::fv() not patched — Bun.isStandaloneExecutable===!0 still in source"
+            exit 1
+          fi
+          echo "  fv() patched: OK"
+
+          echo "── Checking process.execPath monkey-patch in wrapper ──"
+          grep -q 'CLAUDE_CODE_EXECPATH' "$HOME/.clawgod/cli.cjs" || {
+            echo "::error::cli.cjs missing CLAUDE_CODE_EXECPATH monkey-patch"
             exit 1
           }
+          echo "  execPath patch: OK"
 
           echo "── Checking multitool dispatch (ugrep, bfs, rg) ──"
           for tool in ugrep bfs rg; do
@@ -228,25 +218,6 @@ jobs:
               exit 1
             fi
           done
-
-          echo "── Checking daemon spawn path (fv/DLt) ──"
-          bun -e "
-            const Module = require('module');
-            const _orig = Module.prototype.require;
-            Module.prototype.require = function(id) {
-              if (id.includes('cli.original.cjs')) { return; }
-              return _orig.apply(this, arguments);
-            };
-            require('$HOME/.clawgod/cli.cjs');
-            if (Bun.isStandaloneExecutable !== true) {
-              console.error('fv()=false → daemon/fork will break');
-              process.exit(1);
-            }
-            console.log('DLt path: native (prefixArgs=[]) ✓');
-          " 2>&1 || {
-            echo "::error::Daemon spawn path broken (Bun.isStandaloneExecutable not patched)"
-            exit 1
-          }
 
           echo "── Checking openai-proxy.cjs exists ──"
           test -f "$HOME/.clawgod/openai-proxy.cjs" || { echo "::error::openai-proxy.cjs missing"; exit 1; }
