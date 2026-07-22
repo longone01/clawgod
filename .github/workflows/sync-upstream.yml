@@ -1,18 +1,16 @@
 name: Sync upstream and create version branches
 
 on:
-  # 每小时第 7、22、37、52 分钟检查一次，相当于每 15 分钟检查
   schedule:
     - cron: "7,22,37,52 * * * *"
 
-  # 支持在 GitHub Actions 页面手动执行
   workflow_dispatch:
 
-# 允许工作流更新分支
+# 实际写入使用 SYNC_TOKEN。
+# 内置 GITHUB_TOKEN 不需要写权限。
 permissions:
-  contents: write
+  contents: read
 
-# 避免两个同步任务同时运行
 concurrency:
   group: sync-upstream
   cancel-in-progress: false
@@ -27,10 +25,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 使用 GitHub 官方的 merge-upstream API 同步 Fork
+      - name: Check sync token
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Repository secret SYNC_TOKEN is missing."
+            exit 1
+          fi
+
       - name: Sync fork main branch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -43,20 +51,19 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/merge-upstream" \
             -f "branch=${UPSTREAM_BRANCH}"
 
-      # 获取上游 v* Tag，并为缺失的版本创建分支
       - name: Create branches for upstream version tags
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
         run: |
           set -euo pipefail
 
-          # 让 Git 使用 GITHUB_TOKEN 进行 push
           gh auth setup-git
 
           mkdir repository
           cd repository
 
-          git init
+          # 明确指定初始分支名，避免 master 提示
+          git init -b main
 
           git remote add origin \
             "https://github.com/${GITHUB_REPOSITORY}.git"
@@ -66,13 +73,20 @@ jobs:
 
           echo "Fetching fork branches..."
 
-          git fetch --prune origin \
+          git fetch \
+            --no-tags \
+            --prune \
+            origin \
             "+refs/heads/*:refs/remotes/origin/*"
 
           echo "Fetching upstream version tags..."
 
-          # 将上游 v* Tag 放在独立命名空间，避免与 Fork 自己的 Tag 冲突
-          git fetch --prune upstream \
+          # 显式获取 v* Tag 到独立命名空间。
+          # --no-tags 可以阻止 Git 再自动获取一份普通 Tag。
+          git fetch \
+            --no-tags \
+            --prune \
+            upstream \
             "+refs/tags/v*:refs/tags/upstream/v*"
 
           created=0
@@ -84,7 +98,6 @@ jobs:
             branch="${VERSION_BRANCH_PREFIX}${tag}"
             target_commit="$(git rev-parse "${tag_ref}^{commit}")"
 
-            # 检查目标分支是否已经存在
             if git show-ref \
               --verify \
               --quiet \
@@ -97,7 +110,7 @@ jobs:
               if [ "${existing_commit}" = "${target_commit}" ]; then
                 echo "Already exists: ${branch} -> ${target_commit}"
               else
-                echo "::warning::Branch ${branch} already exists but points to ${existing_commit}; expected ${target_commit}. It will not be overwritten."
+                echo "::warning::Branch ${branch} already exists at ${existing_commit}; expected ${target_commit}. It will not be overwritten."
               fi
 
               continue
@@ -105,16 +118,13 @@ jobs:
 
             echo "Creating ${branch} from ${tag}..."
 
-            # 创建本地临时分支引用
             git update-ref \
               "refs/heads/${branch}" \
               "${target_commit}"
 
-            # 推送到 Fork
             git push origin \
               "refs/heads/${branch}:refs/heads/${branch}"
 
-            # 删除本地临时引用
             git update-ref -d \
               "refs/heads/${branch}"
 
