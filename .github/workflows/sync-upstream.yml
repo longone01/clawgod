@@ -1,0 +1,131 @@
+name: Sync upstream and create version branches
+
+on:
+  # 每小时第 7、22、37、52 分钟检查一次，相当于每 15 分钟检查
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+  # 支持在 GitHub Actions 页面手动执行
+  workflow_dispatch:
+
+# 允许工作流更新分支
+permissions:
+  contents: write
+
+# 避免两个同步任务同时运行
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: 0Chencc/clawgod
+  UPSTREAM_BRANCH: main
+  VERSION_BRANCH_PREFIX: version/
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 使用 GitHub 官方的 merge-upstream API 同步 Fork
+      - name: Sync fork main branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "Syncing ${GITHUB_REPOSITORY}:${UPSTREAM_BRANCH}"
+          echo "From upstream ${UPSTREAM_REPO}:${UPSTREAM_BRANCH}"
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/merge-upstream" \
+            -f "branch=${UPSTREAM_BRANCH}"
+
+      # 获取上游 v* Tag，并为缺失的版本创建分支
+      - name: Create branches for upstream version tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # 让 Git 使用 GITHUB_TOKEN 进行 push
+          gh auth setup-git
+
+          mkdir repository
+          cd repository
+
+          git init
+
+          git remote add origin \
+            "https://github.com/${GITHUB_REPOSITORY}.git"
+
+          git remote add upstream \
+            "https://github.com/${UPSTREAM_REPO}.git"
+
+          echo "Fetching fork branches..."
+
+          git fetch --prune origin \
+            "+refs/heads/*:refs/remotes/origin/*"
+
+          echo "Fetching upstream version tags..."
+
+          # 将上游 v* Tag 放在独立命名空间，避免与 Fork 自己的 Tag 冲突
+          git fetch --prune upstream \
+            "+refs/tags/v*:refs/tags/upstream/v*"
+
+          created=0
+
+          while IFS= read -r tag_ref; do
+            [ -n "${tag_ref}" ] || continue
+
+            tag="${tag_ref#refs/tags/upstream/}"
+            branch="${VERSION_BRANCH_PREFIX}${tag}"
+            target_commit="$(git rev-parse "${tag_ref}^{commit}")"
+
+            # 检查目标分支是否已经存在
+            if git show-ref \
+              --verify \
+              --quiet \
+              "refs/remotes/origin/${branch}"; then
+
+              existing_commit="$(
+                git rev-parse "refs/remotes/origin/${branch}"
+              )"
+
+              if [ "${existing_commit}" = "${target_commit}" ]; then
+                echo "Already exists: ${branch} -> ${target_commit}"
+              else
+                echo "::warning::Branch ${branch} already exists but points to ${existing_commit}; expected ${target_commit}. It will not be overwritten."
+              fi
+
+              continue
+            fi
+
+            echo "Creating ${branch} from ${tag}..."
+
+            # 创建本地临时分支引用
+            git update-ref \
+              "refs/heads/${branch}" \
+              "${target_commit}"
+
+            # 推送到 Fork
+            git push origin \
+              "refs/heads/${branch}:refs/heads/${branch}"
+
+            # 删除本地临时引用
+            git update-ref -d \
+              "refs/heads/${branch}"
+
+            echo "Created: ${branch} -> ${target_commit}"
+
+            created=$((created + 1))
+          done < <(
+            git for-each-ref \
+              --sort=version:refname \
+              --format='%(refname)' \
+              "refs/tags/upstream/v*"
+          )
+
+          echo "Created ${created} new version branch(es)."
